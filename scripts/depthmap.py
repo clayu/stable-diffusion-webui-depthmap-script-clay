@@ -97,6 +97,7 @@ def on_ui_settings():
 
     add_option('gen_heatmap_from_ui', False, "Show an option to generate HeatMap in the UI")
     add_option('extra_stereomodes', False, "Enable more possible outputs for stereoimage generation")
+    add_option('gen_quilt', False, "Generate a quilt")
 
 
 from modules import script_callbacks
