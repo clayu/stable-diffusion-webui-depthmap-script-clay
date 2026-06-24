@@ -4,7 +4,7 @@ from src.stereoimage_generation import apply_stereo_divergence
 
 
 def create_quilt(original_image, depthmap, cols, rows, divergence,
-                 stereo_offset_exponent=1.0, fill_technique='polylines_sharp', rotate=False):
+                 stereo_offset_exponent=1.0, fill_technique='polylines_sharp', rotate=False, focus=0.5):
     """Creates a Looking Glass quilt image.
 
     Generates cols*rows views at evenly-spaced angles from +divergence (leftmost camera)
@@ -19,6 +19,7 @@ def create_quilt(original_image, depthmap, cols, rows, divergence,
     :param float stereo_offset_exponent: depth power curve; reuses STEREO_OFFSET_EXPONENT
     :param str fill_technique: gap-fill method; reuses STEREO_FILL_ALGO
     :param bool rotate: rotate each view 90° counter-clockwise before assembling the grid
+    :param float focus: normalized depth (0=far, 1=near) that appears at zero parallax (screen surface)
     """
     original_image = np.asarray(original_image)
     total_views = cols * rows
@@ -33,7 +34,7 @@ def create_quilt(original_image, depthmap, cols, rows, divergence,
             view = original_image.copy()
         else:
             view = apply_stereo_divergence(
-                original_image, depthmap, angle, 0.0, stereo_offset_exponent, fill_technique
+                original_image, depthmap, angle, 0.0, stereo_offset_exponent, fill_technique, focus=focus
             )
         if rotate:
             view = np.rot90(view)

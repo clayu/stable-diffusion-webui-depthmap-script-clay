@@ -272,9 +272,10 @@ def core_generation_funnel(outpath, inputimages, inputdepthmaps, inputnames, inp
                     inp[go.STEREO_DIVERGENCE],
                     inp[go.STEREO_OFFSET_EXPONENT],
                     inp[go.STEREO_FILL_ALGO],
-                    rotate
+                    rotate,
+                    focus=inp[go.QUILT_FOCUS],
                 )
-                yield count, f'qs{cols}x{rows}a{aspect:.2f}', quilt
+                yield count, f'_qs{cols}x{rows}a{aspect:.2f}', quilt
 
             if inp[go.GEN_NORMALMAP]:
                 normalmap = create_normalmap(

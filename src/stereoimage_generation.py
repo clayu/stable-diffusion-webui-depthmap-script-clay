@@ -74,11 +74,17 @@ def create_stereoimages(original_image, depthmap, divergence, separation=0.0, mo
     return [Image.fromarray(r) for r in results]
 
 
-def apply_stereo_divergence(original_image, depth, divergence, separation, stereo_offset_exponent, fill_technique):
+def apply_stereo_divergence(original_image, depth, divergence, separation, stereo_offset_exponent, fill_technique,
+                            focus=0.0):
     assert original_image.shape[:2] == depth.shape, 'Depthmap and the image must have the same size'
     depth_min = depth.min()
     depth_max = depth.max()
     normalized_depth = (depth - depth_min) / (depth_max - depth_min)
+    if focus != 0.0:
+        # Shift so objects at `focus` depth have zero parallax.
+        # Fractional exponents don't work on negative values, so force linear.
+        normalized_depth = normalized_depth - focus
+        stereo_offset_exponent = 1.0
     divergence_px = (divergence / 100.0) * original_image.shape[1]
     separation_px = (separation / 100.0) * original_image.shape[1]
 

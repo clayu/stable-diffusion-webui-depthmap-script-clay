@@ -112,6 +112,9 @@ def main_ui_panel(is_depth_tab):
                     inp += go.QUILT_COLS, gr.Slider(minimum=2, maximum=16, step=1, label='Columns (N)')
                     inp += go.QUILT_ROWS, gr.Slider(minimum=2, maximum=16, step=1, label='Rows (M)')
                 with gr.Row():
+                    inp += go.QUILT_FOCUS, gr.Slider(minimum=0.0, maximum=1.0, step=0.01,
+                                                     label='Focus depth (0=far, 1=near)')
+                with gr.Row():
                     inp += go.QUILT_ROTATE, gr.Checkbox(label="Rotate views 90°")
 
         with gr.Box():
