@@ -339,12 +339,19 @@ def core_generation_funnel(outpath, inputimages, inputdepthmaps, inputnames, inp
                 if fill_mode == 'black':
                     background_plate = Image.new('RGB', inputimages[count].size, (0, 0, 0))
                 elif fill_mode == 'sd_inpaint':
+                    # Depth model occupies most VRAM; offload it before SD inpainting.
+                    model_holder.offload()
+                    gc.collect()
+                    torch.cuda.empty_cache()
                     background_plate, inpaint_mask = _inpaint_background(
                         inputimages[count], img_output,
                         prompt=inp[go.QUILT_FILL_PROMPT])
                     if inp[go.QUILT_FILL_DEBUG]:
                         yield count, 'quilt_inpaint_mask', inpaint_mask
                         yield count, 'quilt_inpaint_plate', background_plate
+                    # Reload depth model to GPU for any remaining images in the batch.
+                    if count < len(inputimages) - 1:
+                        model_holder.reload()
 
                 quilt = create_quilt(
                     inputimages[count], img_output,
