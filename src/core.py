@@ -23,13 +23,11 @@ from src.quilt_generation import create_quilt
 
 
 def _inpaint_background(image, depthmap, prompt=''):
-    """Inpaint foreground objects using SD to produce a background plate."""
-    try:
-        from modules import processing, shared
-    except ImportError:
-        print("Quilt SD inpaint: modules not available (standalone mode). Falling back to original image.")
-        return image
+    """Inpaint foreground objects using SD to produce a background plate.
 
+    Returns (background_plate, mask_pil). mask_pil is always returned so it
+    can be shown as a debug image even if inpainting fails.
+    """
     depth_min, depth_max = float(depthmap.min()), float(depthmap.max())
     if depth_max > depth_min:
         depth_norm = (depthmap.astype(np.float32) - depth_min) / (depth_max - depth_min)
@@ -41,6 +39,12 @@ def _inpaint_background(image, depthmap, prompt=''):
     fg_mask = ((depth_norm > threshold) * 255).astype(np.uint8)
     fg_mask = cv2.dilate(fg_mask, np.ones((5, 5), np.uint8), iterations=2)
     mask_pil = Image.fromarray(fg_mask)
+
+    try:
+        from modules import processing, shared
+    except ImportError:
+        print("Quilt SD inpaint: modules not available (standalone mode). Falling back to original image.")
+        return image, mask_pil
 
     p = processing.StableDiffusionProcessingImg2Img(
         sd_model=shared.sd_model,
@@ -64,10 +68,10 @@ def _inpaint_background(image, depthmap, prompt=''):
 
     try:
         processed = processing.process_images(p)
-        return processed.images[0]
+        return processed.images[0], mask_pil
     except Exception as e:
         print(f"Quilt SD inpaint failed ({e}). Falling back to original image.")
-        return image
+        return image, mask_pil
 from src.normalmap_generation import create_normalmap
 from src.depthmap_generation import ModelHolder
 from src import backbone
@@ -322,9 +326,12 @@ def core_generation_funnel(outpath, inputimages, inputdepthmaps, inputnames, inp
                 if fill_mode == 'black':
                     background_plate = Image.new('RGB', inputimages[count].size, (0, 0, 0))
                 elif fill_mode == 'sd_inpaint':
-                    background_plate = _inpaint_background(
+                    background_plate, inpaint_mask = _inpaint_background(
                         inputimages[count], img_output,
                         prompt=inp[go.QUILT_FILL_PROMPT])
+                    if inp[go.QUILT_FILL_DEBUG]:
+                        yield count, 'quilt_inpaint_mask', inpaint_mask
+                        yield count, 'quilt_inpaint_plate', background_plate
 
                 quilt = create_quilt(
                     inputimages[count], img_output,

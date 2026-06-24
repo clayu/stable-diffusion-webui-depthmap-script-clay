@@ -121,10 +121,14 @@ def main_ui_panel(is_depth_tab):
                         label='Background fill method',
                         choices=['black', 'original', 'sd_inpaint'],
                         type='value')
-                with gr.Row(visible=False) as quilt_inpaint_options:
-                    inp += go.QUILT_FILL_PROMPT, gr.Textbox(
-                        label='Inpaint prompt (empty = context only)',
-                        placeholder='')
+                with gr.Column(visible=False) as quilt_inpaint_options:
+                    with gr.Row():
+                        inp += go.QUILT_FILL_PROMPT, gr.Textbox(
+                            label='Inpaint prompt (empty = context only)',
+                            placeholder='')
+                    with gr.Row():
+                        inp += go.QUILT_FILL_DEBUG, gr.Checkbox(
+                            label='Output debug images (mask + background plate)')
                 with gr.Row():
                     inp += go.QUILT_ROTATE, gr.Checkbox(label="Rotate views 90°")
 

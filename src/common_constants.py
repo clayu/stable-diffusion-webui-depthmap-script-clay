@@ -48,8 +48,9 @@ class GenerationOptions(enum.Enum):
     QUILT_ROTATE = False
     QUILT_DIVERGENCE = 2.5
     QUILT_FOCUS = 0.5
-    QUILT_FILL = 'original'
+    QUILT_FILL = 'sd_inpaint'
     QUILT_FILL_PROMPT = ''
+    QUILT_FILL_DEBUG = False
 
     GEN_NORMALMAP = False
     NORMALMAP_PRE_BLUR = False
