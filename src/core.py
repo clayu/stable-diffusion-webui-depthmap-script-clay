@@ -73,6 +73,9 @@ def _inpaint_background(image, depthmap, prompt=''):
     p.do_not_save_grid = True
 
     try:
+        # The depth generation offloads VAE + CLIP to CPU to free VRAM.
+        # Reload them to GPU before running inpainting, then offload again.
+        backbone.reload_sd_model()
         processed = processing.process_images(p)
         plate = processed.images[0]
         print(f"Quilt SD inpaint: done, result size {plate.size}")
@@ -80,6 +83,8 @@ def _inpaint_background(image, depthmap, prompt=''):
     except Exception as e:
         print(f"Quilt SD inpaint failed — falling back to original image.\n{traceback.format_exc()}")
         return image, mask_pil
+    finally:
+        backbone.unload_sd_model()
 from src.normalmap_generation import create_normalmap
 from src.depthmap_generation import ModelHolder
 from src import backbone
