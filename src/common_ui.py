@@ -109,8 +109,8 @@ def main_ui_panel(is_depth_tab):
                 inp += go.GEN_QUILT, gr.Checkbox(label="Generate Looking Glass quilt")
             with gr.Column(visible=False) as quilt_options:
                 with gr.Row():
-                    inp += go.QUILT_COLS, gr.Slider(minimum=2, maximum=16, step=1, label='Columns (N)')
-                    inp += go.QUILT_ROWS, gr.Slider(minimum=2, maximum=16, step=1, label='Rows (M)')
+                    inp += go.QUILT_COLS, gr.Slider(minimum=1, maximum=16, step=1, label='Columns (N)')
+                    inp += go.QUILT_ROWS, gr.Slider(minimum=1, maximum=16, step=1, label='Rows (M)')
                 with gr.Row():
                     inp += go.QUILT_DIVERGENCE, gr.Slider(minimum=0.05, maximum=15.0, step=0.01,
                                                           label='Divergence (3D effect strength)')
