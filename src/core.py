@@ -19,6 +19,7 @@ from src.misc import *
 from src.common_constants import GenerationOptions as go
 from src.common_constants import *
 from src.stereoimage_generation import create_stereoimages
+from src.quilt_generation import create_quilt
 from src.normalmap_generation import create_normalmap
 from src.depthmap_generation import ModelHolder
 from src import backbone
@@ -257,6 +258,23 @@ def core_generation_funnel(outpath, inputimages, inputdepthmaps, inputnames, inp
                     inp[go.STEREO_BALANCE], inp[go.STEREO_OFFSET_EXPONENT], inp[go.STEREO_FILL_ALGO])
                 for c in range(0, len(stereoimages)):
                     yield count, inp[go.STEREO_MODES][c], stereoimages[c]
+
+            if inp[go.GEN_QUILT]:
+                cols = int(inp[go.QUILT_COLS])
+                rows = int(inp[go.QUILT_ROWS])
+                rotate = inp[go.QUILT_ROTATE]
+                img_w, img_h = inputimages[count].size
+                view_w, view_h = (img_h, img_w) if rotate else (img_w, img_h)
+                aspect = view_w / view_h
+                quilt = create_quilt(
+                    inputimages[count], img_output,
+                    cols, rows,
+                    inp[go.STEREO_DIVERGENCE],
+                    inp[go.STEREO_OFFSET_EXPONENT],
+                    inp[go.STEREO_FILL_ALGO],
+                    rotate
+                )
+                yield count, f'qs{cols}x{rows}a{aspect:.2f}', quilt
 
             if inp[go.GEN_NORMALMAP]:
                 normalmap = create_normalmap(

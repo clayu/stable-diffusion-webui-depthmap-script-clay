@@ -106,6 +106,16 @@ def main_ui_panel(is_depth_tab):
 
         with gr.Box():
             with gr.Row():
+                inp += go.GEN_QUILT, gr.Checkbox(label="Generate Looking Glass quilt")
+            with gr.Column(visible=False) as quilt_options:
+                with gr.Row():
+                    inp += go.QUILT_COLS, gr.Slider(minimum=2, maximum=16, step=1, label='Columns (N)')
+                    inp += go.QUILT_ROWS, gr.Slider(minimum=2, maximum=16, step=1, label='Rows (M)')
+                with gr.Row():
+                    inp += go.QUILT_ROTATE, gr.Checkbox(label="Rotate views 90°")
+
+        with gr.Box():
+            with gr.Row():
                 inp += go.GEN_NORMALMAP, gr.Checkbox(label="Generate NormalMap")
             with gr.Column(visible=False) as normalmap_options:
                 with gr.Row():
@@ -214,6 +224,7 @@ def main_ui_panel(is_depth_tab):
         )
 
         inp.add_rule(stereo_options, 'visible-if', go.GEN_STEREO)
+        inp.add_rule(quilt_options, 'visible-if', go.GEN_QUILT)
         inp.add_rule(normalmap_options, 'visible-if', go.GEN_NORMALMAP)
         inp.add_rule(mesh_options, 'visible-if', go.GEN_SIMPLE_MESH)
         if is_depth_tab:

@@ -42,6 +42,11 @@ class GenerationOptions(enum.Enum):
     STEREO_OFFSET_EXPONENT = 1.0
     STEREO_BALANCE = 0.0
 
+    GEN_QUILT = False
+    QUILT_COLS = 5
+    QUILT_ROWS = 9
+    QUILT_ROTATE = False
+
     GEN_NORMALMAP = False
     NORMALMAP_PRE_BLUR = False
     NORMALMAP_PRE_BLUR_KERNEL = 3
