@@ -277,12 +277,13 @@ def open_folder_action():
 
 
 def depthmap_mode_video(inp):
-    gr.HTML(value="Single video mode allows generating videos from videos. Please "
+    gr.HTML(value="Video mode allows generating videos from videos. Please "
                   "keep in mind that all the frames of the video need to be processed - therefore it is important to "
                   "pick settings so that the generation is not too slow. For the best results, "
-                  "use a zoedepth model, since they provide the highest level of coherency between frames.")
-    inp += gr.File(elem_id='depthmap_vm_input', label="Video or animated file",
-                   file_count="single", interactive=True, type="file")
+                  "use a zoedepth model, since they provide the highest level of coherency between frames. "
+                  "Multiple videos can be uploaded and will be processed sequentially.")
+    inp += gr.File(elem_id='depthmap_vm_input', label="Video or animated file(s)",
+                   file_count="multiple", interactive=True, type="file")
     inp += gr.Checkbox(elem_id="depthmap_vm_custom_checkbox",
                        label="Use custom/pregenerated DepthMap video", value=False)
     inp += gr.Dropdown(elem_id="depthmap_vm_smoothening_mode", label="Smoothening",
@@ -302,7 +303,7 @@ def depthmap_mode_video(inp):
 
 
 custom_css = """
-#depthmap_vm_input {height: 75px}
+#depthmap_vm_input {min-height: 75px}
 #depthmap_vm_custom {height: 75px}
 """
 
@@ -501,18 +502,25 @@ def run_generate(*inputs):
     inputnames = []  # Also keep track of original file names
 
     if depthmap_mode == '3':
-        try:
-            custom_depthmap = inputs['depthmap_vm_custom'] \
-                if inputs['depthmap_vm_custom_checkbox'] else None
-            colorvids_bitrate = inputs['depthmap_vm_compress_bitrate'] \
-                if inputs['depthmap_vm_compress_checkbox'] else None
-            ret = video_mode.gen_video(
-                inputs['depthmap_vm_input'], backbone.get_outpath(), inputs, custom_depthmap, colorvids_bitrate,
-                inputs['depthmap_vm_smoothening_mode'])
-            return [], None, None, ret
-        except Exception as e:
-            ret = format_exception(e)
-        return [], None, None, ret
+        video_inputs = inputs['depthmap_vm_input']
+        if video_inputs is None:
+            return [], None, None, "Please select one or more video files."
+        if not isinstance(video_inputs, list):
+            video_inputs = [video_inputs]
+        custom_depthmap = inputs['depthmap_vm_custom'] \
+            if inputs['depthmap_vm_custom_checkbox'] else None
+        colorvids_bitrate = inputs['depthmap_vm_compress_bitrate'] \
+            if inputs['depthmap_vm_compress_checkbox'] else None
+        results = []
+        for video in video_inputs:
+            try:
+                ret = video_mode.gen_video(
+                    video, backbone.get_outpath(), inputs, custom_depthmap, colorvids_bitrate,
+                    inputs['depthmap_vm_smoothening_mode'])
+                results.append(ret)
+            except Exception as e:
+                results.append(format_exception(e))
+        return [], None, None, '<br>'.join(results)
 
     if depthmap_mode == '2' and depthmap_batch_output_dir != '':
         outpath = depthmap_batch_output_dir
