@@ -22,6 +22,11 @@ def create_quilt(original_image, depthmap, cols, rows, divergence,
     :param float focus: normalized depth (0=far, 1=near) that appears at zero parallax (screen surface)
     """
     original_image = np.asarray(original_image)
+    # Rotate source and depth map before view generation so that horizontal
+    # parallax is applied to the already-rotated content, not turned vertical.
+    if rotate:
+        original_image = np.rot90(original_image)
+        depthmap = np.rot90(depthmap)
     total_views = cols * rows
 
     views = []
@@ -31,14 +36,11 @@ def create_quilt(original_image, depthmap, cols, rows, divergence,
         angle = divergence * (1.0 - 2.0 * t)
 
         if abs(angle) < 1e-6:
-            view = original_image.copy()
+            views.append(original_image.copy())
         else:
-            view = apply_stereo_divergence(
+            views.append(apply_stereo_divergence(
                 original_image, depthmap, angle, 0.0, stereo_offset_exponent, fill_technique, focus=focus
-            )
-        if rotate:
-            view = np.rot90(view)
-        views.append(view)
+            ))
 
     # When rotated, swap grid dimensions so the quilt is in landscape orientation.
     out_cols = rows if rotate else cols
