@@ -40,11 +40,15 @@ def create_quilt(original_image, depthmap, cols, rows, divergence,
             view = np.rot90(view)
         views.append(view)
 
+    # When rotated, swap grid dimensions so the quilt is in landscape orientation.
+    out_cols = rows if rotate else cols
+    out_rows = cols if rotate else rows
+
     # Build rows left-to-right, then stack bottom-to-top (Looking Glass convention).
     # numpy is top-to-bottom, so reverse row order before vstacking.
     row_strips = []
-    for r in range(rows):
-        row_strips.append(np.hstack([views[r * cols + c] for c in range(cols)]))
+    for r in range(out_rows):
+        row_strips.append(np.hstack([views[r * out_cols + c] for c in range(out_cols)]))
     quilt = np.vstack(row_strips[::-1])
 
     return Image.fromarray(quilt)

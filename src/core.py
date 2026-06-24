@@ -266,6 +266,10 @@ def core_generation_funnel(outpath, inputimages, inputdepthmaps, inputnames, inp
                 img_w, img_h = inputimages[count].size
                 view_w, view_h = (img_h, img_w) if rotate else (img_w, img_h)
                 aspect = view_w / view_h
+                # When rotated the grid is assembled with rows/cols swapped;
+                # the filename reflects the actual layout for Looking Glass Studio.
+                qs_cols = rows if rotate else cols
+                qs_rows = cols if rotate else rows
                 quilt = create_quilt(
                     inputimages[count], img_output,
                     cols, rows,
@@ -275,7 +279,7 @@ def core_generation_funnel(outpath, inputimages, inputdepthmaps, inputnames, inp
                     rotate,
                     focus=inp[go.QUILT_FOCUS],
                 )
-                yield count, f'_qs{cols}x{rows}a{aspect:.2f}', quilt
+                yield count, f'_qs{qs_cols}x{qs_rows}a{aspect:.2f}', quilt
 
             if inp[go.GEN_NORMALMAP]:
                 normalmap = create_normalmap(
