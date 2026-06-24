@@ -28,6 +28,8 @@ def _inpaint_background(image, depthmap, prompt=''):
     Returns (background_plate, mask_pil). mask_pil is always returned so it
     can be shown as a debug image even if inpainting fails.
     """
+    import traceback
+
     depth_min, depth_max = float(depthmap.min()), float(depthmap.max())
     if depth_max > depth_min:
         depth_norm = (depthmap.astype(np.float32) - depth_min) / (depth_max - depth_min)
@@ -39,6 +41,7 @@ def _inpaint_background(image, depthmap, prompt=''):
     fg_mask = ((depth_norm > threshold) * 255).astype(np.uint8)
     fg_mask = cv2.dilate(fg_mask, np.ones((5, 5), np.uint8), iterations=2)
     mask_pil = Image.fromarray(fg_mask)
+    print(f"Quilt SD inpaint: mask covers {fg_mask.mean():.1f}% of image (threshold={threshold:.3f})")
 
     try:
         from modules import processing, shared
@@ -46,14 +49,17 @@ def _inpaint_background(image, depthmap, prompt=''):
         print("Quilt SD inpaint: modules not available (standalone mode). Falling back to original image.")
         return image, mask_pil
 
+    print(f"Quilt SD inpaint: using model '{getattr(shared.sd_model, 'sd_checkpoint_info', {}).name}'")
+
     p = processing.StableDiffusionProcessingImg2Img(
         sd_model=shared.sd_model,
         init_images=[image],
         mask=mask_pil,
         mask_blur=4,
-        inpainting_fill=2,        # latent noise — lets the model generate freely
-        inpaint_full_res=False,
-        denoising_strength=0.85,
+        inpainting_fill=1,        # original — initialise from source, then fully denoise
+        inpaint_full_res=True,
+        inpaint_full_res_padding=32,
+        denoising_strength=1.0,   # full replacement of masked area
         prompt=prompt,
         negative_prompt='',
         steps=20,
@@ -68,9 +74,11 @@ def _inpaint_background(image, depthmap, prompt=''):
 
     try:
         processed = processing.process_images(p)
-        return processed.images[0], mask_pil
+        plate = processed.images[0]
+        print(f"Quilt SD inpaint: done, result size {plate.size}")
+        return plate, mask_pil
     except Exception as e:
-        print(f"Quilt SD inpaint failed ({e}). Falling back to original image.")
+        print(f"Quilt SD inpaint failed — falling back to original image.\n{traceback.format_exc()}")
         return image, mask_pil
 from src.normalmap_generation import create_normalmap
 from src.depthmap_generation import ModelHolder
