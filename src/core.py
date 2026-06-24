@@ -22,6 +22,9 @@ from src.stereoimage_generation import create_stereoimages
 from src.quilt_generation import create_quilt
 
 
+_INPAINT_MAX_SIDE = 768  # SD 1.5 inpainting VRAM budget; result is upscaled back
+
+
 def _inpaint_background(image, depthmap, prompt=''):
     """Inpaint foreground objects using SD to produce a background plate.
 
@@ -41,7 +44,7 @@ def _inpaint_background(image, depthmap, prompt=''):
     fg_mask = ((depth_norm > threshold) * 255).astype(np.uint8)
     fg_mask = cv2.dilate(fg_mask, np.ones((5, 5), np.uint8), iterations=2)
     mask_pil = Image.fromarray(fg_mask)
-    print(f"Quilt SD inpaint: mask covers {fg_mask.mean():.1f}% of image (threshold={threshold:.3f})")
+    print(f"Quilt SD inpaint: mask covers {fg_mask.mean() / 255 * 100:.1f}% of image (threshold={threshold:.3f})")
 
     try:
         from modules import processing, shared
@@ -49,23 +52,39 @@ def _inpaint_background(image, depthmap, prompt=''):
         print("Quilt SD inpaint: modules not available (standalone mode). Falling back to original image.")
         return image, mask_pil
 
-    print(f"Quilt SD inpaint: using model '{getattr(shared.sd_model, 'sd_checkpoint_info', {}).name}'")
+    # Downscale to fit within _INPAINT_MAX_SIDE so the VAE doesn't OOM on large sources.
+    # The background plate is upscaled back afterward — fine for gap-fill purposes.
+    orig_w, orig_h = image.size
+    scale = min(_INPAINT_MAX_SIDE / orig_w, _INPAINT_MAX_SIDE / orig_h, 1.0)
+    if scale < 1.0:
+        iw = max(64, int(orig_w * scale) // 64 * 64)
+        ih = max(64, int(orig_h * scale) // 64 * 64)
+        image_in = image.resize((iw, ih), Image.LANCZOS)
+        mask_in = mask_pil.resize((iw, ih), Image.NEAREST)
+        print(f"Quilt SD inpaint: resizing {orig_w}x{orig_h} → {iw}x{ih} for inference")
+    else:
+        iw, ih = orig_w, orig_h
+        image_in = image
+        mask_in = mask_pil
+
+    model_name = getattr(getattr(shared.sd_model, 'sd_checkpoint_info', None), 'name', '?')
+    print(f"Quilt SD inpaint: using model '{model_name}'")
 
     p = processing.StableDiffusionProcessingImg2Img(
         sd_model=shared.sd_model,
-        init_images=[image],
-        mask=mask_pil,
+        init_images=[image_in],
+        mask=mask_in,
         mask_blur=4,
-        inpainting_fill=1,        # original — initialise from source, then fully denoise
+        inpainting_fill=1,
         inpaint_full_res=True,
         inpaint_full_res_padding=32,
-        denoising_strength=1.0,   # full replacement of masked area
+        denoising_strength=1.0,
         prompt=prompt,
         negative_prompt='',
         steps=20,
         cfg_scale=7.5,
-        width=image.width,
-        height=image.height,
+        width=iw,
+        height=ih,
         batch_size=1,
         n_iter=1,
     )
@@ -73,11 +92,10 @@ def _inpaint_background(image, depthmap, prompt=''):
     p.do_not_save_grid = True
 
     try:
-        # The depth generation offloads VAE + CLIP to CPU to free VRAM.
-        # Reload them to GPU before running inpainting, then offload again.
         backbone.reload_sd_model()
         processed = processing.process_images(p)
-        plate = processed.images[0]
+        plate_small = processed.images[0]
+        plate = plate_small.resize((orig_w, orig_h), Image.LANCZOS) if scale < 1.0 else plate_small
         print(f"Quilt SD inpaint: done, result size {plate.size}")
         return plate, mask_pil
     except Exception as e:
