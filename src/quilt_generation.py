@@ -3,7 +3,8 @@ from PIL import Image
 
 
 def create_quilt(original_image, depthmap, cols, rows, divergence,
-                 stereo_offset_exponent=1.0, fill_technique='polylines_sharp', rotate=False, focus=0.5):
+                 stereo_offset_exponent=1.0, fill_technique='polylines_sharp', rotate=False, focus=0.5,
+                 background_plate=None):
     """Creates a Looking Glass quilt image.
 
     Generates cols*rows views at evenly-spaced angles from +divergence (leftmost camera)
@@ -26,9 +27,12 @@ def create_quilt(original_image, depthmap, cols, rows, divergence,
     :param float focus: normalized depth (0=far, 1=near) at zero parallax
     """
     original_image = np.asarray(original_image)
+    # Resolve background plate before rotation so both are rotated together.
+    fill_source = np.asarray(background_plate) if background_plate is not None else original_image
     if rotate:
         original_image = np.rot90(original_image)
         depthmap = np.rot90(depthmap)
+        fill_source = np.rot90(fill_source)
 
     H, W, C = original_image.shape
     total_views = cols * rows
@@ -76,11 +80,9 @@ def create_quilt(original_image, depthmap, cols, rows, divergence,
         view[row_idx, col_dst] = source_sorted
         filled[row_idx, col_dst] = True
 
-        # Fill disoccluded gaps from the original image.
-        # Background pixels have near-zero depth so they barely shift between views;
-        # the original value at the gap position is a good approximation and — crucially —
-        # it is the same reference for every view, so the fill is temporally consistent.
-        view = np.where(filled[:, :, np.newaxis], view, original_image).astype(np.uint8)
+        # Fill disoccluded gaps from the background plate (or original if none provided).
+        # Using a fixed reference per view keeps the fill temporally consistent.
+        view = np.where(filled[:, :, np.newaxis], view, fill_source).astype(np.uint8)
         views.append(view)
 
     # Assemble quilt grid. Rotate swaps grid dimensions for landscape layout.

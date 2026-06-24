@@ -20,6 +20,54 @@ from src.common_constants import GenerationOptions as go
 from src.common_constants import *
 from src.stereoimage_generation import create_stereoimages
 from src.quilt_generation import create_quilt
+
+
+def _inpaint_background(image, depthmap, prompt=''):
+    """Inpaint foreground objects using SD to produce a background plate."""
+    try:
+        from modules import processing, shared
+    except ImportError:
+        print("Quilt SD inpaint: modules not available (standalone mode). Falling back to original image.")
+        return image
+
+    depth_min, depth_max = float(depthmap.min()), float(depthmap.max())
+    if depth_max > depth_min:
+        depth_norm = (depthmap.astype(np.float32) - depth_min) / (depth_max - depth_min)
+    else:
+        depth_norm = np.zeros(depthmap.shape, dtype=np.float32)
+
+    # Foreground mask: pixels above median depth (white = inpaint this area).
+    threshold = float(np.median(depth_norm))
+    fg_mask = ((depth_norm > threshold) * 255).astype(np.uint8)
+    fg_mask = cv2.dilate(fg_mask, np.ones((5, 5), np.uint8), iterations=2)
+    mask_pil = Image.fromarray(fg_mask)
+
+    p = processing.StableDiffusionProcessingImg2Img(
+        sd_model=shared.sd_model,
+        init_images=[image],
+        mask=mask_pil,
+        mask_blur=4,
+        inpainting_fill=2,        # latent noise — lets the model generate freely
+        inpaint_full_res=False,
+        denoising_strength=0.85,
+        prompt=prompt,
+        negative_prompt='',
+        steps=20,
+        cfg_scale=7.5,
+        width=image.width,
+        height=image.height,
+        batch_size=1,
+        n_iter=1,
+    )
+    p.do_not_save_samples = True
+    p.do_not_save_grid = True
+
+    try:
+        processed = processing.process_images(p)
+        return processed.images[0]
+    except Exception as e:
+        print(f"Quilt SD inpaint failed ({e}). Falling back to original image.")
+        return image
 from src.normalmap_generation import create_normalmap
 from src.depthmap_generation import ModelHolder
 from src import backbone
@@ -266,10 +314,18 @@ def core_generation_funnel(outpath, inputimages, inputdepthmaps, inputnames, inp
                 img_w, img_h = inputimages[count].size
                 view_w, view_h = (img_h, img_w) if rotate else (img_w, img_h)
                 aspect = view_w / view_h
-                # When rotated the grid is assembled with rows/cols swapped;
-                # the filename reflects the actual layout for Looking Glass Studio.
                 qs_cols = rows if rotate else cols
                 qs_rows = cols if rotate else rows
+
+                fill_mode = inp[go.QUILT_FILL]
+                background_plate = None
+                if fill_mode == 'black':
+                    background_plate = Image.new('RGB', inputimages[count].size, (0, 0, 0))
+                elif fill_mode == 'sd_inpaint':
+                    background_plate = _inpaint_background(
+                        inputimages[count], img_output,
+                        prompt=inp[go.QUILT_FILL_PROMPT])
+
                 quilt = create_quilt(
                     inputimages[count], img_output,
                     cols, rows,
@@ -278,6 +334,7 @@ def core_generation_funnel(outpath, inputimages, inputdepthmaps, inputnames, inp
                     inp[go.STEREO_FILL_ALGO],
                     rotate,
                     focus=inp[go.QUILT_FOCUS],
+                    background_plate=background_plate,
                 )
                 yield count, f'_qs{qs_cols}x{qs_rows}a{aspect:.2f}', quilt
 
