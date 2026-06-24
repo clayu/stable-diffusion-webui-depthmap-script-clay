@@ -273,7 +273,7 @@ def core_generation_funnel(outpath, inputimages, inputdepthmaps, inputnames, inp
                 quilt = create_quilt(
                     inputimages[count], img_output,
                     cols, rows,
-                    inp[go.STEREO_DIVERGENCE],
+                    inp[go.QUILT_DIVERGENCE],
                     inp[go.STEREO_OFFSET_EXPONENT],
                     inp[go.STEREO_FILL_ALGO],
                     rotate,

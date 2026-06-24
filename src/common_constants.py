@@ -46,6 +46,7 @@ class GenerationOptions(enum.Enum):
     QUILT_COLS = 5
     QUILT_ROWS = 9
     QUILT_ROTATE = False
+    QUILT_DIVERGENCE = 2.5
     QUILT_FOCUS = 0.5
 
     GEN_NORMALMAP = False
