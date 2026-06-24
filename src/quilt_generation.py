@@ -64,7 +64,14 @@ def create_quilt(original_image, depthmap, cols, rows, divergence,
     order_f = order.astype(np.float32)
     W_scale = W / 100.0
 
-    views = []
+    # Assemble quilt grid. Rotate swaps grid dimensions for landscape layout.
+    out_cols = rows if rotate else cols
+    out_rows = cols if rotate else rows
+
+    # Pre-allocate once; write each view directly into its grid slot.
+    # This avoids accumulating a views list and the costly stack+transpose+copy chain.
+    quilt = np.zeros((out_rows * H, out_cols * W, C), dtype=np.uint8)
+
     for v in range(total_views):
         a = float(angles[v])
 
@@ -74,28 +81,17 @@ def create_quilt(original_image, depthmap, cols, rows, divergence,
             0, W - 1
         ).astype(np.int32)  # (H, W)
 
-        # Scatter: far pixels first, near pixels last → near overwrites far.
-        view = np.zeros((H, W, C), dtype=np.uint8)
-        filled = np.zeros((H, W), dtype=bool)
-        view[row_idx, col_dst] = source_sorted
-        filled[row_idx, col_dst] = True
+        # LG convention: view 0 is leftmost, placed at bottom-left of the quilt.
+        # Views increase left→right within a row, then bottom→top across rows.
+        col_in_grid = v % out_cols
+        row_in_grid = v // out_cols
+        out_row = out_rows - 1 - row_in_grid  # row 0 sits at the image bottom
 
-        # Fill disoccluded gaps from the background plate (or original if none provided).
-        # Using a fixed reference per view keeps the fill temporally consistent.
-        view = np.where(filled[:, :, np.newaxis], view, fill_source).astype(np.uint8)
-        views.append(view)
+        qs = quilt[out_row * H:(out_row + 1) * H, col_in_grid * W:(col_in_grid + 1) * W]
 
-    # Assemble quilt grid. Rotate swaps grid dimensions for landscape layout.
-    out_cols = rows if rotate else cols
-    out_rows = cols if rotate else rows
-
-    views_array = np.stack(views)  # (V, H, W, C)
-    quilt = (views_array
-             .reshape(out_rows, out_cols, H, W, C)
-             .transpose(0, 2, 1, 3, 4)               # (out_rows, H, out_cols, W, C)
-             .reshape(out_rows, H, out_cols * W, C)
-             [::-1]                                   # bottom row first in output image
-             .copy()
-             .reshape(out_rows * H, out_cols * W, C))
+        # Fill gaps from background plate first; scatter foreground on top.
+        # Near pixels were sorted last so they overwrite far pixels (correct occlusion).
+        qs[:] = fill_source
+        qs[row_idx, col_dst] = source_sorted
 
     return Image.fromarray(quilt)
